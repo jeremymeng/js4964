@@ -1,25 +1,19 @@
-const { Aborter, AppendBlobURL, BlobURL, ServiceURL, StorageURL, ContainerURL, SharedKeyCredential } = require("@azure/storage-blob");
+const { BlobServiceClient, SharedKeyCredential } = require("@azure/storage-blob");
 const heapdump = require('heapdump');
 
 async function main() {
   const accountName = process.env.ACCOUNT_NAME || "";
   const accountKey = process.env.ACCOUNT_KEY || "";
 
-  const sharedKeyCredential = new SharedKeyCredential(accountName, accountKey);
-
-  // Use sharedKeyCredential, tokenCredential or anonymousCredential to create a pipeline
-  const pipeline = StorageURL.newPipeline(sharedKeyCredential);
-  console.log(pipeline);
-  const serviceURL = new ServiceURL(
+  const client = new BlobServiceClient(
     `https://${accountName}.blob.core.windows.net`,
-    pipeline
-  );
+    new SharedKeyCredential(accountName, accountKey)
+  )
 
-  const containerName = "appendtestcontainer1";
-  const containerURL = ContainerURL.fromServiceURL(serviceURL, containerName);
+  const containerClient = client.getContainerClient("appendtestcontainer1");
 
   try {
-    await containerURL.create(Aborter.none);
+    await containerClient.create();
 
   } catch (e) {
     if (!e.message.search("/already exists/g")) {
@@ -29,25 +23,23 @@ async function main() {
 
   }
 
-  const blobName = "appendtestappendblob1";
-  const blobURL = BlobURL.fromContainerURL(containerURL, blobName);
-  const appendClient = AppendBlobURL.fromBlobURL(blobURL);
-  await appendClient.create(Aborter.none);
+
+  const appendClient = containerClient.getAppendBlobClient("appendtestappendblob1");
+  await appendClient.create();
 
   const content = "Hello World!";
 
   let i = 1000;
   while (i--) {
-    if (i % 100 === 0) {
+    if (i === 500 || i === 501) {
       console.log("Dumping heap...");
       heapdump.writeSnapshot();
     }
-    await appendClient.appendBlock(Aborter.none, content, content.length);
+    await appendClient.appendBlock(content, content.length);
     console.log(`block left: ${i}`);
-
   }
 
-  await containerURL.delete(Aborter.none);
+  await containerClient.delete();
 
 }
 
