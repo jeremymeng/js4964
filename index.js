@@ -1,5 +1,6 @@
 const { BlobServiceClient, SharedKeyCredential } = require("@azure/storage-blob");
 const heapdump = require('heapdump');
+const readline = require('readline');
 
 async function main() {
   const accountName = process.env.ACCOUNT_NAME || "";
@@ -29,11 +30,12 @@ async function main() {
 
   const content = "Hello World!";
 
+  heapdump.writeSnapshot("before-appending");
   let i = 1000;
   while (i--) {
     if (i === 500 || i === 501) {
       console.log("Dumping heap...");
-      heapdump.writeSnapshot();
+      //heapdump.writeSnapshot();
     }
     await appendClient.appendBlock(content, content.length);
     console.log(`block left: ${i}`);
@@ -41,6 +43,21 @@ async function main() {
 
   await containerClient.delete();
 
+  if (global.gc) {
+    console.log("Forcing GC...");
+    global.gc();
+    heapdump.writeSnapshot("after-gc");
+  }
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+
+  });
+
+  rl.question('Press any key to continue...', (answer) => {
+    // TODO: Log the answer in a database
+    rl.close();
+  });
 }
 
 // An async method returns a Promise object, which is compatible with then().catch() coding style.
